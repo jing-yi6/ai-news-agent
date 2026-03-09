@@ -19,7 +19,7 @@
 #### 1. 克隆仓库
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/jing-yi6/ai-news-agent.git
 cd ai-news-agent
 ```
 
@@ -52,7 +52,7 @@ python run.py --mock
 
 ```bash
 # 克隆仓库
-git clone <repository-url>
+git clone https://github.com/jing-yi6/ai-news-agent.git
 cd ai-news-agent
 
 # 安装依赖
