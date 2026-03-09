@@ -33,24 +33,17 @@ conda env create -f environment.yml
 conda activate ai-news-agent
 ```
 
-#### 3. 安装可选依赖（用于 LLM 摘要功能）
-
-```bash
-# 如需使用 OpenAI API
-pip install openai>=1.0.0
-
-# 如需使用 Anthropic API
-pip install anthropic>=0.18.0
-
-# 或同时安装
-pip install openai>=1.0.0 anthropic>=0.18.0
-```
-
-#### 4. 配置环境变量
+#### 3. 配置环境变量
 
 ```bash
 cp .env.example .env
 # 编辑 .env 文件，填入你的 API 密钥
+```
+
+#### 4. 验证安装
+
+```bash
+python run.py --mock
 ```
 
 ---
@@ -285,7 +278,13 @@ conda activate ai-news-agent
 
 ### 问题：LLM 摘要不可用
 
-**解决**：检查是否配置了 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`，并安装相关依赖：
+**解决**：确保在 `environment.yml` 中配置了 LLM 依赖，然后重新创建环境：
+```bash
+conda env update -f environment.yml
+conda activate ai-news-agent
+```
+
+或手动安装：
 ```bash
 pip install openai anthropic
 ```
