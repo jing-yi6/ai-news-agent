@@ -48,12 +48,21 @@ python run.py --mock
 
 ---
 
-### 方式二：使用 pip
+### 方式二：使用 pip + venv
 
 ```bash
 # 克隆仓库
 git clone https://github.com/jing-yi6/ai-news-agent.git
 cd ai-news-agent
+
+# 创建虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+# Linux/macOS:
+source venv/bin/activate
+# Windows:
+# venv\Scripts\activate
 
 # 安装依赖
 pip install -r requirements.txt
