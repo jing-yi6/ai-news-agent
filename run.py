@@ -131,7 +131,7 @@ async def main_async():
 
     # 分类
     print("📂 分类内容...")
-    categories = filter_.categorize_items(filtered)
+    categories = await filter_.categorize_items(filtered)
     for cat, cat_items in categories.items():
         print(f"  - {cat}: {len(cat_items)}")
 
@@ -140,7 +140,7 @@ async def main_async():
         print("📝 生成关键要点...")
         summarizer = Summarizer(provider)
         for cat, cat_items in categories.items():
-            points = summarizer.extract_key_points(cat_items, max_points=3)
+            points = await summarizer.extract_key_points(cat_items, max_points=3)
             if points:
                 print(f"  [{cat}] {points[0][:50]}...")
 

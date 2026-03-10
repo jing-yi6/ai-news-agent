@@ -9,6 +9,38 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 
+# =============================================================================
+# Monkey patch for twscrape - Fix "Failed to parse scripts" error
+# Issue: https://github.com/vladkens/twscrape/issues/284
+# Twitter returns malformed JSON with unquoted keys
+# =============================================================================
+import json
+import re
+
+def _patched_get_scripts_list(text: str):
+    """修复 Twitter 返回的畸形 JSON"""
+    scripts = text.split('e=>e+"."+')[1].split('[e]+"a.js"')[0]
+
+    try:
+        for k, v in json.loads(scripts).items():
+            yield f"https://abs.twimg.com/responsive-web/client-web/{k}.{v}a.js"
+    except json.decoder.JSONDecodeError:
+        # 修复未加引号的键，如: node_modules_pnpm_ws_8_18_0_node_modules_ws_browser_js
+        fixed_scripts = re.sub(
+            r'([,\{])(\s*)([\w]+_[\w_]+)(\s*):',
+            r'\1\2"\3"\4:',
+            scripts
+        )
+        for k, v in json.loads(fixed_scripts).items():
+            yield f"https://abs.twimg.com/responsive-web/client-web/{k}.{v}a.js"
+
+# 应用 patch（在导入 twscrape 之前）
+try:
+    from twscrape import xclid
+    xclid.get_scripts_list = _patched_get_scripts_list
+except ImportError:
+    pass  # twscrape 未安装时跳过
+
 
 @dataclass
 class Tweet:
@@ -51,6 +83,17 @@ class XClient:
         self._api = None
         self._initialized = False
         self._rate_limit = rate_limit
+        self._last_request_time: Optional[float] = None
+        self._lock = asyncio.Lock()
+
+    async def _rate_limit_wait(self):
+        """等待以满足速率限制"""
+        async with self._lock:
+            if self._last_request_time is not None:
+                elapsed = asyncio.get_event_loop().time() - self._last_request_time
+                if elapsed < self._rate_limit:
+                    await asyncio.sleep(self._rate_limit - elapsed)
+            self._last_request_time = asyncio.get_event_loop().time()
 
     async def _init_api(self):
         """初始化 twscrape API"""
@@ -64,8 +107,8 @@ class XClient:
                 "twscrape is required. Install it with: pip install twscrape"
             )
 
-        # 初始化 API，设置速率限制（每秒 1 次请求）
-        self._api = API(rate_limit=self._rate_limit)
+        # 初始化 API
+        self._api = API()
 
         # 如果有账号配置，添加账号
         if self.account_config:
@@ -75,17 +118,17 @@ class XClient:
             email_password = self.account_config.get("email_password")
             cookies = self.account_config.get("cookies")
 
-            if cookies:
-                # 使用 cookies 登录
-                await self._api.add_cookies(username, cookies)
+            if cookies and username:
+                # 使用 cookies 登录（需要用户名和 cookies）
+                await self._api.pool.add_account(username, "", "", "", cookies=cookies)
             elif username and password:
                 # 使用用户名密码登录
-                await self._api.add_account(username, password, email or "", email_password or "")
+                await self._api.pool.add_account(username, password, email or "", email_password or "")
                 # 尝试登录获取 cookies
-                await self._api.login(username)
+                await self._api.pool.login(username)
             else:
                 raise ValueError(
-                    "Must provide either 'cookies' or 'username' and 'password' in account_config"
+                    "Must provide either 'cookies' with 'username', or 'username' and 'password' in account_config"
                 )
 
         self._initialized = True
@@ -97,10 +140,10 @@ class XClient:
         return User(
             id=str(user_data.id),
             username=user_data.username,
-            name=user_data.display_name or user_data.username,
-            description=getattr(user_data, 'description', ''),
-            followers_count=getattr(user_data, 'followers_count', 0),
-            following_count=getattr(user_data, 'following_count', 0),
+            name=getattr(user_data, 'displayname', user_data.username),
+            description=getattr(user_data, 'rawDescription', ''),
+            followers_count=getattr(user_data, 'followersCount', 0),
+            following_count=getattr(user_data, 'friendsCount', 0),
         )
 
     def _to_tweet(self, tweet_data, author: Optional[User] = None) -> Optional[Tweet]:
@@ -108,8 +151,8 @@ class XClient:
         if not tweet_data:
             return None
 
-        # 处理日期
-        created_at = getattr(tweet_data, 'created_at', None)
+        # 处理日期 
+        created_at = getattr(tweet_data, 'date', None)
         if isinstance(created_at, str):
             try:
                 created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
@@ -124,20 +167,21 @@ class XClient:
             author_username = author.username
             author_name = author.name
         else:
-            author_id = str(getattr(tweet_data, 'user_id', ''))
-            author_username = getattr(tweet_data, 'username', '')
-            author_name = getattr(tweet_data, 'display_name', author_username)
+            author_id = str(getattr(tweet_data.user, 'id', ''))
+            author_username = getattr(tweet_data.user, 'username', '')
+            author_name = getattr(tweet_data.user, 'displayname', author_username)
 
-        # 获取互动数据
-        views = getattr(tweet_data, 'views', 0) or 0
-        likes = getattr(tweet_data, 'likes', 0) or 0
-        replies = getattr(tweet_data, 'replies', 0) or 0
-        retweets = getattr(tweet_data, 'retweets', 0) or 0
-        quotes = getattr(tweet_data, 'quotes', 0) or 0
+        # 获取互动数据 (twscrape 用驼峰命名)
+        likes = getattr(tweet_data, 'likeCount', 0) or 0
+        replies = getattr(tweet_data, 'replyCount', 0) or 0
+        retweets = getattr(tweet_data, 'retweetCount', 0) or 0
+        quotes = getattr(tweet_data, 'quoteCount', 0) or 0
+
+        text = getattr(tweet_data, 'rawContent', '') or ''
 
         return Tweet(
             id=str(tweet_data.id),
-            text=tweet_data.raw_text or tweet_data.text or '',
+            text=text,
             created_at=created_at,
             author_id=author_id,
             author_username=author_username,
@@ -159,6 +203,7 @@ class XClient:
             用户信息
         """
         await self._init_api()
+        await self._rate_limit_wait()
         try:
             user_data = await self._api.user_by_login(username.lstrip("@"))
             return self._to_user(user_data)
@@ -177,6 +222,7 @@ class XClient:
             用户信息
         """
         await self._init_api()
+        await self._rate_limit_wait()
         try:
             user_data = await self._api.user_by_id(int(user_id))
             return self._to_user(user_data)
@@ -208,22 +254,23 @@ class XClient:
             推文列表
         """
         await self._init_api()
+        await self._rate_limit_wait()
 
         tweets = []
         try:
             # 获取用户推文
             async for tweet_data in self._api.user_tweets(int(user_id), limit=max_results):
-                # 过滤回复
-                if exclude_replies and getattr(tweet_data, 'is_reply', False):
+                # 过滤回复 (inReplyToTweetId 不为 None 表示是回复)
+                if exclude_replies and tweet_data.inReplyToTweetId is not None:
                     continue
 
-                # 过滤转发
-                if exclude_retweets and getattr(tweet_data, 'is_retweet', False):
+                # 过滤转发 (retweetedTweet 不为 None 表示是转发)
+                if exclude_retweets and tweet_data.retweetedTweet is not None:
                     continue
 
                 # 时间过滤
                 if start_time or end_time:
-                    created_at = getattr(tweet_data, 'created_at', None)
+                    created_at = getattr(tweet_data, 'date', None)  # twscrape 使用 'date' 而不是 'created_at'
                     if created_at:
                         if isinstance(created_at, str):
                             try:
@@ -271,6 +318,7 @@ class XClient:
             关注的用户列表
         """
         await self._init_api()
+        await self._rate_limit_wait()
 
         following = []
         try:

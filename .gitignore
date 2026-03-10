@@ -38,6 +38,7 @@ ENV/
 
 # Environment variables
 .env
+accounts.db
 
 # Output directory
 output/

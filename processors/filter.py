@@ -1,6 +1,7 @@
 """
 内容过滤器
 """
+import asyncio
 import re
 from typing import Iterator, TYPE_CHECKING
 
@@ -111,8 +112,8 @@ class ContentFilter:
         filtered.sort(key=lambda x: x.engagement_score, reverse=True)
         return filtered
 
-    def _categorize_with_llm(self, item: ContentItem) -> str:
-        """使用 LLM 对内容进行智能分类"""
+    async def _categorize_with_llm(self, item: ContentItem) -> str:
+        """使用 LLM 对内容进行智能分类（异步版本）"""
         if not self.llm_provider:
             # 如果没有 LLM provider，回退到关键词分类
             return self._categorize_with_keywords(item)
@@ -126,7 +127,13 @@ class ContentFilter:
                 Message(role="user", content=prompt)
             ]
 
-            response = self.llm_provider.chat_complete(messages, temperature=0.1, max_tokens=50)
+            # 使用 asyncio.to_thread 将同步调用转为异步
+            response = await asyncio.to_thread(
+                self.llm_provider.chat_complete,
+                messages,
+                temperature=0.1,
+                max_tokens=50
+            )
             category = response.content.strip()
 
             # 映射到标准类别
@@ -173,17 +180,37 @@ class ContentFilter:
         return "其他资讯"
 
     def categorize(self, item: ContentItem) -> str:
-        """分类单条内容"""
+        """分类单条内容（同步版本，用于非 LLM 分类）"""
         if self.use_llm_categorize and self.llm_provider:
-            return self._categorize_with_llm(item)
+            # 异步版本需要在 async 上下文中调用
+            raise RuntimeError("请使用 categorize_items 方法进行 LLM 分类")
         return self._categorize_with_keywords(item)
 
-    def categorize_items(self, items: list[ContentItem]) -> dict[str, list[ContentItem]]:
-        """分类内容列表"""
+    async def categorize_items(self, items: list[ContentItem]) -> dict[str, list[ContentItem]]:
+        """分类内容列表（支持异步并行 LLM 调用）"""
         categories: dict[str, list[ContentItem]] = {}
 
-        for item in items:
-            category = self.categorize(item)
-            categories.setdefault(category, []).append(item)
+        if self.use_llm_categorize and self.llm_provider:
+            # 使用 LLM 异步并行分类
+            # 限制并发数，避免 API 限制
+            semaphore = asyncio.Semaphore(10)
+
+            async def categorize_with_limit(item: ContentItem) -> tuple[ContentItem, str]:
+                async with semaphore:
+                    category = await self._categorize_with_llm(item)
+                    return item, category
+
+            # 并行处理所有分类任务
+            tasks = [categorize_with_limit(item) for item in items]
+            results = await asyncio.gather(*tasks)
+
+            # 整理结果
+            for item, category in results:
+                categories.setdefault(category, []).append(item)
+        else:
+            # 使用关键词分类（同步）
+            for item in items:
+                category = self._categorize_with_keywords(item)
+                categories.setdefault(category, []).append(item)
 
         return categories
