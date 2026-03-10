@@ -79,9 +79,10 @@ cp .env.example .env
 
 #### 方式一：使用 Cookies（推荐）
 
-从浏览器开发者工具复制 cookies：
+从浏览器开发者工具复制 cookies。注意：**即使使用 cookies 方式，也需要提供 `X_USERNAME`**：
 
 ```bash
+X_USERNAME=your_twitter_username
 X_COOKIES=auth_token=xxx;ct0=yyy
 ```
 
@@ -107,6 +108,10 @@ LLM_PROVIDER=openai          # openai 或 anthropic
 LLM_API_KEY=your_api_key
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-3.5-turbo
+
+# LLM 参数（可选）
+LLM_TEMPERATURE=0.3          # 范围：0.0 - 2.0
+LLM_MAX_TOKENS=1000          # 必须 > 0
 ```
 
 ## 🚀 使用方法
@@ -127,7 +132,7 @@ python run.py --help
 | `--output` | 输出目录 | `output` |
 | `--max-following` | 最多获取关注用户数 | 30 |
 | `--tweets-per-user` | 每个用户获取推文数 | 10 |
-| `--min-engagement` | 最小互动数过滤 | 0 |
+| `--min-engagement` | 最小互动数过滤（必须 >= 0） | 0 |
 | `--use-llm` | 使用 LLM 智能分类 | False |
 
 ## 📊 输出示例
@@ -186,7 +191,8 @@ Excited to announce GPT-5 preview with significant improvements...
 1. **账号安全**：使用 Cookies 方式更安全，不会暴露密码
 2. **用户 ID**：获取关注列表需要目标用户的数字 ID，非用户名
 3. **LLM 可选**：不配置 LLM 也能运行，会使用关键词分类
-4. **速率限制**：twscrape 会自动处理速率限制，但频繁抓取可能导致账号暂时受限
+4. **速率限制**：`X_RATE_LIMIT` 控制请求间隔（秒/次），默认 1.0，必须 >= 0
+5. **配置验证**：程序启动时会验证配置值，无效配置会导致启动失败
 
 ## 📄 License
 

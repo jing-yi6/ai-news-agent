@@ -4,6 +4,8 @@ AI News Agent - 每日 AI 资讯摘要生成器
 """
 import argparse
 import asyncio
+import logging
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,10 +13,13 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import AppConfig
+from config import AppConfig, setup_logging
 from providers import create_llm_provider
 from datasources import create_datasource
 from processors import ContentFilter, Summarizer, MarkdownFormatter
+
+# 获取 logger
+logger = logging.getLogger(__name__)
 
 
 def parse_args():
@@ -35,6 +40,11 @@ def parse_args():
 
 def get_time_window(days_back: int = 1) -> tuple[str, str]:
     """获取时间窗口"""
+    if days_back < 0:
+        raise ValueError(f"days_back must be non-negative, got {days_back}")
+    if days_back > 365:
+        raise ValueError(f"days_back must be <= 365, got {days_back}")
+
     now = datetime.now(timezone.utc)
     start = (now - timedelta(days=days_back)).replace(hour=0, minute=0, second=0, microsecond=0)
     end = now.replace(hour=23, minute=59, second=59, microsecond=0)
@@ -45,10 +55,14 @@ async def main_async():
     """异步主函数"""
     args = parse_args()
 
-    print("=" * 60)
-    print("🤖 AI News Agent")
-    print("=" * 60)
-    print()
+    # 设置日志
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_file = os.getenv("LOG_FILE")
+    setup_logging(level=getattr(logging, log_level), log_file=log_file)
+
+    logger.info("=" * 60)
+    logger.info("🤖 AI News Agent")
+    logger.info("=" * 60)
 
     # 加载配置
     config = AppConfig.load()
@@ -61,7 +75,7 @@ async def main_async():
         datasource_name,
         config.datasource.config if datasource_name == config.datasource.name else {}
     )
-    print(f"📡 数据源: {datasource_name}")
+    logger.info(f"📡 数据源: {datasource_name}")
 
     # 创建 LLM Provider（如果启用）
     provider = None
@@ -73,17 +87,17 @@ async def main_async():
                 config.llm.base_url,
                 config.llm.model
             )
-            print(f"🤖 LLM: {config.llm.provider} ({config.llm.model})")
+            logger.info(f"🤖 LLM: {config.llm.provider} ({config.llm.model})")
         except Exception as e:
-            print(f"⚠️ LLM 初始化失败: {e}")
+            logger.warning(f"LLM 初始化失败: {e}")
 
     # 获取数据
-    print("\n🔍 获取内容...")
+    logger.info("\n🔍 获取内容...")
     start_time, end_time = get_time_window()
 
     items = []
     if args.users:
-        print(f"用户: {', '.join(args.users)}")
+        logger.info(f"用户: {', '.join(args.users)}")
         async for item in datasource.fetch_by_users(
             args.users,
             max_results=args.tweets_per_user,
@@ -94,10 +108,10 @@ async def main_async():
     else:
         user_id = args.user_id or config.datasource.config.get("user_id")
         if not user_id and datasource_name != "mock":
-            print("❌ 错误: 未指定用户列表或用户 ID")
+            logger.error("❌ 错误: 未指定用户列表或用户 ID")
             sys.exit(1)
 
-        print(f"关注列表: {user_id or 'mock'}")
+        logger.info(f"关注列表: {user_id or 'mock'}")
         async for item in datasource.fetch_by_followings(
             user_id or "mock",
             max_following=args.max_following,
@@ -107,14 +121,14 @@ async def main_async():
         ):
             items.append(item)
 
-    print(f"📊 原始内容: {len(items)}")
+    logger.info(f"📊 原始内容: {len(items)}")
 
     if not items:
-        print("⚠️ 未获取到任何内容")
+        logger.warning("⚠️ 未获取到任何内容")
         return
 
     # 过滤
-    print("🔍 过滤 AI 相关内容...")
+    logger.info("🔍 过滤 AI 相关内容...")
     filter_ = ContentFilter(
         min_engagement=args.min_engagement or config.min_engagement,
         require_ai_keywords=config.require_ai_keywords,
@@ -123,40 +137,40 @@ async def main_async():
         use_llm_categorize=args.use_llm and provider is not None
     )
     filtered = filter_.filter_items(iter(items))
-    print(f"📊 过滤后: {len(filtered)}")
+    logger.info(f"📊 过滤后: {len(filtered)}")
 
     if not filtered:
-        print("⚠️ 没有符合条件的内容")
+        logger.warning("⚠️ 没有符合条件的内容")
         return
 
     # 分类
-    print("📂 分类内容...")
+    logger.info("📂 分类内容...")
     categories = await filter_.categorize_items(filtered)
     for cat, cat_items in categories.items():
-        print(f"  - {cat}: {len(cat_items)}")
+        logger.info(f"  - {cat}: {len(cat_items)}")
 
     # 生成摘要
     if provider:
-        print("📝 生成关键要点...")
+        logger.info("📝 生成关键要点...")
         summarizer = Summarizer(provider)
         for cat, cat_items in categories.items():
             points = await summarizer.extract_key_points(cat_items, max_points=3)
             if points:
-                print(f"  [{cat}] {points[0][:50]}...")
+                logger.info(f"  [{cat}] {points[0][:50]}...")
 
     # 格式化输出
-    print("\n🎨 生成输出...")
+    logger.info("\n🎨 生成输出...")
     formatter = MarkdownFormatter(output_dir=args.output or config.output_dir)
 
     date = args.date or datetime.now().strftime("%Y-%m-%d")
     summary_file = formatter.save_daily_summary(categories, date=date)
 
-    print()
-    print("=" * 60)
-    print("✅ 完成!")
-    print("=" * 60)
-    print(f"📄 详细摘要: {summary_file}")
-    print(f"📊 总计: {len(filtered)} 条 / {len(categories)} 个分类")
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("✅ 完成!")
+    logger.info("=" * 60)
+    logger.info(f"📄 详细摘要: {summary_file}")
+    logger.info(f"📊 总计: {len(filtered)} 条 / {len(categories)} 个分类")
 
 
 def main():

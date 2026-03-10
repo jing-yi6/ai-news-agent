@@ -1,10 +1,14 @@
 """
 X (Twitter) 数据源实现 - 使用 twscrape
 """
+import asyncio
+import logging
 from typing import AsyncIterator
 
 from datasources.base import BaseDataSource, ContentItem
 from datasources.clients import XClient, Tweet, User
+
+logger = logging.getLogger(__name__)
 
 
 class XDataSource(BaseDataSource):
@@ -36,7 +40,7 @@ class XDataSource(BaseDataSource):
             self._client = XClient(account_config=self._account_config, rate_limit=float(rate_limit))
         return self._client
 
-    def _tweet_to_item(self, tweet: Tweet, author: User | None = None) -> ContentItem:
+    def _tweet_to_item(self, tweet: Tweet) -> ContentItem:
         """将 Tweet 转换为 ContentItem"""
         return ContentItem(
             id=tweet.id,
@@ -59,22 +63,27 @@ class XDataSource(BaseDataSource):
         start_time = kwargs.get("start_time")
         end_time = kwargs.get("end_time")
 
-        for username in usernames:
+        async def fetch_single_user(username: str) -> list[Tweet]:
+            """获取单个用户的推文"""
             username = username.lstrip("@")
             user = await client.get_user_by_username(username)
             if not user:
-                print(f"Warning: Could not find user @{username}")
-                continue
-
-            tweets = await client.get_user_tweets(
+                logger.warning(f"Could not find user @{username}")
+                return []
+            return await client.get_user_tweets(
                 user_id=user.id,
                 max_results=max_results,
                 start_time=start_time,
                 end_time=end_time
             )
 
+        # 并行获取所有用户的推文
+        tasks = [fetch_single_user(username) for username in usernames]
+        results = await asyncio.gather(*tasks)
+
+        for tweets in results:
             for tweet in tweets:
-                yield self._tweet_to_item(tweet, author=user)
+                yield self._tweet_to_item(tweet)
 
     async def fetch_by_followings(self, user_id: str, **kwargs) -> AsyncIterator[ContentItem]:
         """异步获取关注列表的推文"""
@@ -86,15 +95,22 @@ class XDataSource(BaseDataSource):
 
         following = await client.get_user_following(user_id, max_results=max_following)
 
-        for user in following:
-            tweets = await client.get_user_tweets(
+        async def fetch_user_tweets(user: User) -> list[Tweet]:
+            """获取单个关注用户的推文"""
+            return await client.get_user_tweets(
                 user_id=user.id,
                 max_results=tweets_per_user,
                 start_time=start_time,
                 end_time=end_time
             )
+
+        # 并行获取所有关注用户的推文
+        tasks = [fetch_user_tweets(user) for user in following]
+        results = await asyncio.gather(*tasks)
+
+        for tweets in results:
             for tweet in tweets:
-                yield self._tweet_to_item(tweet, author=user)
+                yield self._tweet_to_item(tweet)
 
     async def get_user_id(self, username: str) -> str | None:
         """异步获取用户 ID"""

@@ -2,10 +2,13 @@
 摘要生成器
 """
 import asyncio
+import logging
 import re
 
 from providers.base import BaseLLMProvider, Message
 from datasources.base import ContentItem
+
+logger = logging.getLogger(__name__)
 
 
 class Summarizer:
@@ -33,7 +36,7 @@ class Summarizer:
             )
             return response.content.strip()
         except Exception as e:
-            print(f"LLM summarization failed: {e}")
+            logger.warning(f"LLM summarization failed: {e}")
             return self._simple_summarize(text, max_length)
 
     def _simple_summarize(self, text: str, max_length: int) -> str:

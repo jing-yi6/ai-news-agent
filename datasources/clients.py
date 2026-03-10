@@ -5,17 +5,14 @@ API 客户端统一模块
 添加新数据源时，在此文件中添加对应的客户端类。
 """
 import asyncio
+import json
+import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 
-# =============================================================================
-# Monkey patch for twscrape - Fix "Failed to parse scripts" error
-# Issue: https://github.com/vladkens/twscrape/issues/284
-# Twitter returns malformed JSON with unquoted keys
-# =============================================================================
-import json
-import re
+logger = logging.getLogger(__name__)
 
 def _patched_get_scripts_list(text: str):
     """修复 Twitter 返回的畸形 JSON"""
@@ -208,7 +205,7 @@ class XClient:
             user_data = await self._api.user_by_login(username.lstrip("@"))
             return self._to_user(user_data)
         except Exception as e:
-            print(f"Error getting user {username}: {e}")
+            logger.warning(f"Error getting user {username}: {e}")
             return None
 
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
@@ -227,7 +224,7 @@ class XClient:
             user_data = await self._api.user_by_id(int(user_id))
             return self._to_user(user_data)
         except Exception as e:
-            print(f"Error getting user {user_id}: {e}")
+            logger.warning(f"Error getting user {user_id}: {e}")
             return None
 
     async def get_user_tweets(
@@ -302,7 +299,7 @@ class XClient:
                     break
 
         except Exception as e:
-            print(f"Error getting tweets for user {user_id}: {e}")
+            logger.error(f"Error getting tweets for user {user_id}: {e}")
 
         return tweets[:max_results]
 
@@ -331,7 +328,7 @@ class XClient:
                     break
 
         except Exception as e:
-            print(f"Error getting following for user {user_id}: {e}")
+            logger.error(f"Error getting following for user {user_id}: {e}")
 
         return following[:max_results]
 

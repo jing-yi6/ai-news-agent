@@ -2,6 +2,7 @@
 内容过滤器
 """
 import asyncio
+import logging
 import re
 from typing import Iterator, TYPE_CHECKING
 
@@ -9,6 +10,8 @@ from datasources.base import ContentItem
 
 if TYPE_CHECKING:
     from providers.base import BaseLLMProvider
+
+logger = logging.getLogger(__name__)
 
 
 # 分类提示词模板
@@ -29,41 +32,57 @@ CATEGORIZE_PROMPT = """你是一个专业的AI资讯分类助手。请将以下�
 
 类别："""
 
+# AI 相关关键词
+_AI_KEYWORDS = [
+    "AI", "artificial intelligence",
+    "LLM", "large language model",
+    "GPT", "GPT-4", "GPT-5", "GPT-3",
+    "Claude", "Gemini", "Llama", "Mistral",
+    "transformer", "neural network", "deep learning",
+    "machine learning", "ML",
+    "generative AI", "GenAI",
+    "multimodal", "diffusion",
+    "RAG", "fine-tuning", "pre-training",
+    "AGI", "artificial general intelligence",
+    "OpenAI", "Anthropic", "DeepMind", "Google AI", "Meta AI",
+    "Hugging Face", "Stability AI", "Midjourney",
+    "ChatGPT", "Copilot", "Bard",
+    "paper", "research", "benchmark",
+    "arXiv", "NeurIPS", "ICML", "ICLR", "CVPR",
+    "training", "inference", "token",
+    "parameter", "billion parameters",
+    "chatbot", "assistant",
+    "code generation", "text generation",
+    "image generation", "video generation",
+    "AI agent", "autonomous agent",
+]
+
+# 排除的关键词
+_EXCLUDE_KEYWORDS = [
+    "crypto", "bitcoin", "blockchain", "NFT",
+    "giveaway", "airdrop", "free",
+    "follow me", "follow back",
+]
+
+# 预编译正则表达式
+_AI_PATTERN = re.compile(
+    r'\b(' + '|'.join(re.escape(kw) for kw in _AI_KEYWORDS) + r')\b',
+    re.IGNORECASE
+)
+_EXCLUDE_PATTERN = re.compile(
+    r'\b(' + '|'.join(re.escape(kw) for kw in _EXCLUDE_KEYWORDS) + r')\b',
+    re.IGNORECASE
+)
+
 
 class ContentFilter:
     """内容过滤器"""
 
-    # AI 相关关键词
-    AI_KEYWORDS = [
-        "AI", "artificial intelligence",
-        "LLM", "large language model",
-        "GPT", "GPT-4", "GPT-5", "GPT-3",
-        "Claude", "Gemini", "Llama", "Mistral",
-        "transformer", "neural network", "deep learning",
-        "machine learning", "ML",
-        "generative AI", "GenAI",
-        "multimodal", "diffusion",
-        "RAG", "fine-tuning", "pre-training",
-        "AGI", "artificial general intelligence",
-        "OpenAI", "Anthropic", "DeepMind", "Google AI", "Meta AI",
-        "Hugging Face", "Stability AI", "Midjourney",
-        "ChatGPT", "Copilot", "Bard",
-        "paper", "research", "benchmark",
-        "arXiv", "NeurIPS", "ICML", "ICLR", "CVPR",
-        "training", "inference", "token",
-        "parameter", "billion parameters",
-        "chatbot", "assistant",
-        "code generation", "text generation",
-        "image generation", "video generation",
-        "AI agent", "autonomous agent",
-    ]
+    # AI 相关关键词（保留用于参考和关键词分类）
+    AI_KEYWORDS = _AI_KEYWORDS
 
     # 排除的关键词
-    EXCLUDE_KEYWORDS = [
-        "crypto", "bitcoin", "blockchain", "NFT",
-        "giveaway", "airdrop", "free",
-        "follow me", "follow back",
-    ]
+    EXCLUDE_KEYWORDS = _EXCLUDE_KEYWORDS
 
     def __init__(
         self,
@@ -79,15 +98,9 @@ class ContentFilter:
         self.llm_provider = llm_provider
         self.use_llm_categorize = use_llm_categorize
 
-        # 编译正则表达式
-        self.ai_pattern = re.compile(
-            r'\b(' + '|'.join(re.escape(kw) for kw in self.AI_KEYWORDS) + r')\b',
-            re.IGNORECASE
-        )
-        self.exclude_pattern = re.compile(
-            r'\b(' + '|'.join(re.escape(kw) for kw in self.EXCLUDE_KEYWORDS) + r')\b',
-            re.IGNORECASE
-        )
+        # 使用预编译的正则表达式
+        self.ai_pattern = _AI_PATTERN
+        self.exclude_pattern = _EXCLUDE_PATTERN
 
     def filter_items(self, items: Iterator[ContentItem]) -> list[ContentItem]:
         """过滤内容"""
@@ -155,7 +168,7 @@ class ContentFilter:
             return category
 
         except Exception as e:
-            print(f"LLM 分类失败: {e}, 使用关键词分类")
+            logger.warning(f"LLM 分类失败: {e}, 使用关键词分类")
             return self._categorize_with_keywords(item)
 
     def _categorize_with_keywords(self, item: ContentItem) -> str:

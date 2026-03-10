@@ -1,10 +1,14 @@
 """
 Markdown 格式化器
 """
+import logging
 import os
+import re
 from datetime import datetime
 
 from datasources.base import ContentItem
+
+logger = logging.getLogger(__name__)
 
 
 class MarkdownFormatter:
@@ -111,9 +115,14 @@ class MarkdownFormatter:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)
 
-        print(f"Saved: {filepath}")
+        logger.info(f"Saved: {filepath}")
         return filepath
 
     def _slugify(self, text: str) -> str:
         """转换为 URL slug"""
-        return text.lower().replace(" ", "-").replace("/", "-")
+        # 转换为小写，替换非字母数字字符为连字符
+        text = re.sub(r'[^\w\s-]', '-', text.lower())
+        # 将多个空格或连字符替换为单个连字符
+        text = re.sub(r'[-\s]+', '-', text)
+        # 去除首尾连字符
+        return text.strip('-')
