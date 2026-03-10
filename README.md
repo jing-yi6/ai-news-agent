@@ -114,6 +114,18 @@ LLM_TEMPERATURE=0.3          # 范围：0.0 - 2.0
 LLM_MAX_TOKENS=1000          # 必须 > 0
 ```
 
+### 日志配置（可选）
+
+```bash
+LOG_DIR=logs                 # 日志文件目录，默认 logs
+```
+
+日志文件自动生成，格式：`ai-news_YYYYMMDD_HHMMSS.log`
+
+**日志级别**：
+- 主程序：INFO 及以上
+- 第三方库（HTTPX 等）：只显示 WARNING 及以上（避免请求日志刷屏）
+
 ## 🚀 使用方法
 
 ### 完整命令行参数

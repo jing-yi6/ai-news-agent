@@ -4,30 +4,68 @@
 import logging
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Self
 
 
-def setup_logging(level: int = logging.INFO, log_file: str | None = None) -> None:
+def setup_logging(
+    console_level: int = logging.INFO,
+    file_level: int = logging.INFO,
+    log_dir: str = "logs"
+) -> str:
     """设置日志配置
 
     Args:
-        level: 日志级别 (DEBUG, INFO, WARNING, ERROR)
-        log_file: 日志文件路径，为 None 则只输出到控制台
+        console_level: 控制台日志级别（默认 INFO）
+        file_level: 文件日志级别（默认 INFO）
+        log_dir: 日志文件目录（默认 logs）
+
+    Returns:
+        生成的日志文件路径
     """
-    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    # 生成带时间戳的日志文件名
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = os.path.join(log_dir, f"ai-news_{timestamp}.log")
+    os.makedirs(log_dir, exist_ok=True)
 
-    if log_file:
-        os.makedirs(os.path.dirname(log_file) or '.', exist_ok=True)
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
-        file_handler.setLevel(level)
-        handlers.append(file_handler)
+    # 创建根 logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)  # 允许所有级别，由 handler 过滤
 
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        handlers=handlers
+    # 清除现有 handlers
+    root_logger.handlers.clear()
+
+    # 控制台 handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(console_level)
+    console_format = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%H:%M:%S'
     )
+    console_handler.setFormatter(console_format)
+    root_logger.addHandler(console_handler)
+
+    # 文件 handler
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(file_level)
+    file_format = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    file_handler.setFormatter(file_format)
+    root_logger.addHandler(file_handler)
+
+    # 过滤第三方库的日志（只保留 WARNING 及以上）
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("twscrape").setLevel(logging.WARNING)
+
+    # 记录启动信息
+    logger = logging.getLogger(__name__)
+    logger.info(f"日志系统初始化完成")
+    logger.info(f"日志文件: {log_file}")
+
+    return log_file
 
 
 def _load_dotenv():

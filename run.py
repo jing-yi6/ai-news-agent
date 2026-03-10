@@ -55,10 +55,9 @@ async def main_async():
     """异步主函数"""
     args = parse_args()
 
-    # 设置日志
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_file = os.getenv("LOG_FILE")
-    setup_logging(level=getattr(logging, log_level), log_file=log_file)
+    # 设置日志（只记录 WARNING 及以上，生成带时间戳的日志文件）
+    log_dir = os.getenv("LOG_DIR", "logs")
+    log_file = setup_logging(log_dir=log_dir)
 
     logger.info("=" * 60)
     logger.info("🤖 AI News Agent")
