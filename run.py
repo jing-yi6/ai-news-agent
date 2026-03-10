@@ -3,6 +3,7 @@
 AI News Agent - 每日 AI 资讯摘要生成器
 """
 import argparse
+import asyncio
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -40,8 +41,8 @@ def get_time_window(days_back: int = 1) -> tuple[str, str]:
     return start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def main():
-    """主函数"""
+async def main_async():
+    """异步主函数"""
     args = parse_args()
 
     print("=" * 60)
@@ -80,14 +81,16 @@ def main():
     print("\n🔍 获取内容...")
     start_time, end_time = get_time_window()
 
+    items = []
     if args.users:
         print(f"用户: {', '.join(args.users)}")
-        items = list(datasource.fetch_by_users(
+        async for item in datasource.fetch_by_users(
             args.users,
             max_results=args.tweets_per_user,
             start_time=start_time,
             end_time=end_time
-        ))
+        ):
+            items.append(item)
     else:
         user_id = args.user_id or config.datasource.config.get("user_id")
         if not user_id and datasource_name != "mock":
@@ -95,13 +98,14 @@ def main():
             sys.exit(1)
 
         print(f"关注列表: {user_id or 'mock'}")
-        items = list(datasource.fetch_by_followings(
+        async for item in datasource.fetch_by_followings(
             user_id or "mock",
             max_following=args.max_following,
             tweets_per_user=args.tweets_per_user,
             start_time=start_time,
             end_time=end_time
-        ))
+        ):
+            items.append(item)
 
     print(f"📊 原始内容: {len(items)}")
 
@@ -153,6 +157,11 @@ def main():
     print("=" * 60)
     print(f"📄 详细摘要: {summary_file}")
     print(f"📊 总计: {len(filtered)} 条 / {len(categories)} 个分类")
+
+
+def main():
+    """同步入口 - 统一事件循环入口"""
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 模拟数据源，用于测试
 """
 from datetime import datetime, timedelta, timezone
-from typing import Iterator
+from typing import AsyncIterator
 
 from datasources.base import BaseDataSource, ContentItem
 
@@ -41,17 +41,18 @@ class MockDataSource(BaseDataSource):
 
         return items
 
-    def fetch_by_users(self, usernames: list[str], **kwargs) -> Iterator[ContentItem]:
-        """获取指定用户的内容"""
+    async def fetch_by_users(self, usernames: list[str], **kwargs) -> AsyncIterator[ContentItem]:
+        """异步获取指定用户的内容"""
         username_set = {u.lstrip("@").lower() for u in usernames}
         for item in self._generate_items():
             if item.author_username.lower() in username_set:
                 yield item
 
-    def fetch_by_followings(self, user_id: str, **kwargs) -> Iterator[ContentItem]:
-        """获取所有模拟内容"""
-        yield from self._generate_items()
+    async def fetch_by_followings(self, user_id: str, **kwargs) -> AsyncIterator[ContentItem]:
+        """异步获取所有模拟内容"""
+        for item in self._generate_items():
+            yield item
 
-    def get_user_id(self, username: str) -> str | None:
-        """模拟获取用户 ID"""
+    async def get_user_id(self, username: str) -> str | None:
+        """异步模拟获取用户 ID"""
         return username.lstrip("@").lower()

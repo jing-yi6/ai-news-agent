@@ -28,7 +28,6 @@ class LLMConfig:
     @classmethod
     def from_env(cls) -> Self | None:
         """从环境变量加载"""
-        # 优先统一配置
         if api_key := os.getenv("LLM_API_KEY"):
             return cls(
                 provider=os.getenv("LLM_PROVIDER", "openai").lower(),
@@ -67,6 +66,8 @@ class DataSourceConfig:
                 "cookies": os.getenv("X_COOKIES"),
                 # 用户 ID（用于获取关注列表）
                 "user_id": os.getenv("X_USER_ID"),
+                # 请求速率限制（秒/次）
+                "rate_limit": os.getenv("X_RATE_LIMIT", "1.0"),
             }
         )
 

@@ -1,7 +1,7 @@
 """
 X (Twitter) 数据源实现 - 使用 twscrape
 """
-from typing import Iterator
+from typing import AsyncIterator
 
 from datasources.base import BaseDataSource, ContentItem
 from datasources.clients import XClient, Tweet, User
@@ -31,7 +31,9 @@ class XDataSource(BaseDataSource):
                     "  - cookies: Twitter cookies 字符串，或\n"
                     "  - username + password: Twitter 用户名和密码"
                 )
-            self._client = XClient(account_config=self._account_config)
+            # 获取速率限制配置（默认 1.0 秒/次）
+            rate_limit = self.config.get("rate_limit") or self.config.get("X_RATE_LIMIT", 1.0)
+            self._client = XClient(account_config=self._account_config, rate_limit=float(rate_limit))
         return self._client
 
     def _tweet_to_item(self, tweet: Tweet, author: User | None = None) -> ContentItem:
@@ -50,8 +52,8 @@ class XDataSource(BaseDataSource):
             quotes=tweet.quote_count,
         )
 
-    def fetch_by_users(self, usernames: list[str], **kwargs) -> Iterator[ContentItem]:
-        """获取指定用户的推文"""
+    async def fetch_by_users(self, usernames: list[str], **kwargs) -> AsyncIterator[ContentItem]:
+        """异步获取指定用户的推文"""
         client = self._get_client()
         max_results = kwargs.get("max_results", 10)
         start_time = kwargs.get("start_time")
@@ -59,12 +61,12 @@ class XDataSource(BaseDataSource):
 
         for username in usernames:
             username = username.lstrip("@")
-            user = client.get_user_by_username_sync(username)
+            user = await client.get_user_by_username(username)
             if not user:
                 print(f"Warning: Could not find user @{username}")
                 continue
 
-            tweets = client.get_user_tweets_sync(
+            tweets = await client.get_user_tweets(
                 user_id=user.id,
                 max_results=max_results,
                 start_time=start_time,
@@ -74,18 +76,18 @@ class XDataSource(BaseDataSource):
             for tweet in tweets:
                 yield self._tweet_to_item(tweet, author=user)
 
-    def fetch_by_followings(self, user_id: str, **kwargs) -> Iterator[ContentItem]:
-        """获取关注列表的推文"""
+    async def fetch_by_followings(self, user_id: str, **kwargs) -> AsyncIterator[ContentItem]:
+        """异步获取关注列表的推文"""
         client = self._get_client()
         max_following = kwargs.get("max_following", 50)
         tweets_per_user = kwargs.get("tweets_per_user", 10)
         start_time = kwargs.get("start_time")
         end_time = kwargs.get("end_time")
 
-        following = client.get_user_following_sync(user_id, max_results=max_following)
+        following = await client.get_user_following(user_id, max_results=max_following)
 
         for user in following:
-            tweets = client.get_user_tweets_sync(
+            tweets = await client.get_user_tweets(
                 user_id=user.id,
                 max_results=tweets_per_user,
                 start_time=start_time,
@@ -94,8 +96,8 @@ class XDataSource(BaseDataSource):
             for tweet in tweets:
                 yield self._tweet_to_item(tweet, author=user)
 
-    def get_user_id(self, username: str) -> str | None:
-        """获取用户 ID"""
+    async def get_user_id(self, username: str) -> str | None:
+        """异步获取用户 ID"""
         client = self._get_client()
-        user = client.get_user_by_username_sync(username.lstrip("@"))
+        user = await client.get_user_by_username(username.lstrip("@"))
         return user.id if user else None

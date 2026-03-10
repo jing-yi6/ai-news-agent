@@ -70,7 +70,7 @@ class ContentFilter:
         require_ai_keywords: bool = True,
         exclude_promotional: bool = False,
         llm_provider: "BaseLLMProvider | None" = None,
-        use_llm_categorize: bool = True
+        use_llm_categorize: bool = False
     ):
         self.min_engagement = min_engagement
         self.require_ai_keywords = require_ai_keywords

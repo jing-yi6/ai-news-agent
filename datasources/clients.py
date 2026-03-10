@@ -39,21 +39,18 @@ class User:
 class XClient:
     """X (Twitter) 客户端 - 使用 twscrape 库"""
 
-    def __init__(self, account_config: Optional[Dict] = None):
+    def __init__(self, account_config: Optional[Dict] = None, rate_limit: float = 1.0):
         """
         初始化 X 客户端
 
         Args:
-            account_config: 账号配置，包含以下字段:
-                - username: Twitter 用户名
-                - password: Twitter 密码 (可选)
-                - email: 邮箱 (可选)
-                - email_password: 邮箱密码 (可选)
-                - cookies: cookies 字符串 (可选，直接使用 cookies 登录)
+            account_config: 账号配置
+            rate_limit: 请求间隔（秒），默认 1 秒一次
         """
         self.account_config = account_config or {}
         self._api = None
         self._initialized = False
+        self._rate_limit = rate_limit
 
     async def _init_api(self):
         """初始化 twscrape API"""
@@ -67,7 +64,8 @@ class XClient:
                 "twscrape is required. Install it with: pip install twscrape"
             )
 
-        self._api = API()
+        # 初始化 API，设置速率限制（每秒 1 次请求）
+        self._api = API(rate_limit=self._rate_limit)
 
         # 如果有账号配置，添加账号
         if self.account_config:
@@ -288,23 +286,6 @@ class XClient:
             print(f"Error getting following for user {user_id}: {e}")
 
         return following[:max_results]
-
-    # 同步包装方法（保持向后兼容）
-    def get_user_by_username_sync(self, username: str) -> Optional[User]:
-        """同步获取用户信息"""
-        return asyncio.run(self.get_user_by_username(username))
-
-    def get_user_by_id_sync(self, user_id: str) -> Optional[User]:
-        """同步获取用户信息"""
-        return asyncio.run(self.get_user_by_id(user_id))
-
-    def get_user_tweets_sync(self, user_id: str, **kwargs) -> List[Tweet]:
-        """同步获取用户推文"""
-        return asyncio.run(self.get_user_tweets(user_id, **kwargs))
-
-    def get_user_following_sync(self, user_id: str, max_results: int = 100) -> List[User]:
-        """同步获取用户关注列表"""
-        return asyncio.run(self.get_user_following(user_id, max_results))
 
 
 # =============================================================================

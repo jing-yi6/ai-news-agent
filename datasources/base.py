@@ -4,7 +4,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterator
+from typing import AsyncIterator
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,16 +35,16 @@ class BaseDataSource(ABC):
         self.config = config
 
     @abstractmethod
-    def fetch_by_users(self, usernames: list[str], **kwargs) -> Iterator[ContentItem]:
-        """获取指定用户的内容"""
+    async def fetch_by_users(self, usernames: list[str], **kwargs) -> AsyncIterator[ContentItem]:
+        """异步获取指定用户的内容"""
         raise NotImplementedError
 
     @abstractmethod
-    def fetch_by_followings(self, user_id: str, **kwargs) -> Iterator[ContentItem]:
-        """获取用户关注列表的内容"""
+    async def fetch_by_followings(self, user_id: str, **kwargs) -> AsyncIterator[ContentItem]:
+        """异步获取用户关注列表的内容"""
         raise NotImplementedError
 
     @abstractmethod
-    def get_user_id(self, username: str) -> str | None:
-        """将用户名转换为用户 ID"""
+    async def get_user_id(self, username: str) -> str | None:
+        """异步将用户名转换为用户 ID"""
         raise NotImplementedError
