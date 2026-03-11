@@ -14,6 +14,16 @@ logger = logging.getLogger(__name__)
 class MarkdownFormatter:
     """Markdown 格式化器"""
 
+    # 类别显示顺序
+    CATEGORY_ORDER = [
+        "模型发布",
+        "研究进展",
+        "产品更新",
+        "教程资源",
+        "行业动态",
+        "其他资讯",
+    ]
+
     def __init__(self, output_dir: str = "output"):
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -84,16 +94,19 @@ class MarkdownFormatter:
         if categories:
             lines.append("## 📑 目录")
             lines.append("")
-            for category in categories.keys():
-                lines.append(f"- [{category}](#{self._slugify(category)})")
+            for category in self.CATEGORY_ORDER:
+                if category in categories:
+                    lines.append(f"- [{category}](#{self._slugify(category)})")
             lines.append("")
             lines.append("---")
             lines.append("")
 
         # 内容
-        for category, items in categories.items():
-            lines.append(self.format_category(category, items, translations))
-            lines.append("")
+        for category in self.CATEGORY_ORDER:
+            if category in categories:
+                items = categories[category]
+                lines.append(self.format_category(category, items, translations))
+                lines.append("")
 
         # 页脚
         lines.extend([
