@@ -50,7 +50,7 @@ The codebase uses a plugin architecture for extensibility:
 
 3. **Processors** (`processors/`): Data transformation pipeline
    - `ContentFilter`: Filters by keywords/engagement, categorizes content
-   - `Summarizer`: Generates LLM-based summaries
+   - `Translator`: Translates English content to Chinese
    - `MarkdownFormatter`: Outputs Markdown digests
 
 ### Async Architecture
@@ -86,13 +86,13 @@ run.py
   → datasource.fetch_by_*()  # Async iteration
   → ContentFilter.filter_items()  # Keyword filtering
   → ContentFilter.categorize_items()  # LLM or keyword categorization
-  → [Optional] Summarizer.extract_key_points()  # LLM summary
+  → [Optional] Translator.translate_items()  # Translate to Chinese
   → MarkdownFormatter.save_daily_summary()  # Output
 ```
 
 ### Rate Limiting
 
-`XClient` passes `rate_limit` parameter to `twscrape.API(rate_limit=X)`. This controls request pacing to avoid account restrictions.
+`XClient` implements rate limiting via `_rate_limit_wait()` method that waits between requests based on the `rate_limit` configuration. This controls request pacing to avoid account restrictions.
 
 ### Key Implementation Details
 

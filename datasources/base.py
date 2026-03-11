@@ -17,6 +17,7 @@ class ContentItem:
     author_username: str
     created_at: datetime
     url: str
+    source: str = ""  # 数据来源标识 (x, wechat, etc.)
     likes: int = 0
     replies: int = 0
     retweets: int = 0

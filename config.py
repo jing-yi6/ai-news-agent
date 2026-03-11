@@ -172,6 +172,7 @@ class AppConfig:
     min_engagement: int
     require_ai_keywords: bool
     exclude_promotional: bool
+    translate_sources: set[str]  # 需要翻译的数据源列表
 
     def __post_init__(self):
         """验证配置值"""
@@ -184,6 +185,10 @@ class AppConfig:
         """加载完整配置"""
         _load_dotenv()
 
+        # 解析需要翻译的数据源（默认不翻译）
+        translate_env = os.getenv("TRANSLATE_SOURCES", "").lower()
+        translate_sources = set(s.strip() for s in translate_env.split(",") if s.strip())
+
         return cls(
             llm=LLMConfig.from_env(),
             datasource=DataSourceConfig.from_env(),
@@ -191,4 +196,5 @@ class AppConfig:
             min_engagement=int(os.getenv("MIN_ENGAGEMENT", "0")),
             require_ai_keywords=os.getenv("REQUIRE_AI_KEYWORDS", "false").lower() == "true",
             exclude_promotional=os.getenv("EXCLUDE_PROMOTIONAL", "false").lower() == "true",
+            translate_sources=translate_sources,
         )

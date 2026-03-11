@@ -18,14 +18,20 @@ class MarkdownFormatter:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-    def format_item(self, item: ContentItem, include_author: bool = True) -> str:
+    def format_item(self, item: ContentItem, include_author: bool = True, translation: str | None = None) -> str:
         """格式化单条内容"""
         lines = []
 
         if include_author:
             lines.append(f"**[@{item.author_username}](https://x.com/{item.author_username})** ({item.author_name})")
 
-        lines.append(item.content)
+        # 原文
+        lines.append(f"📝 {item.content}")
+
+        # 中文翻译（如果有）
+        if translation:
+            lines.append(f"")
+            lines.append(f"🇨🇳 **中文**: {translation}")
 
         # 元信息
         meta = []
@@ -40,13 +46,15 @@ class MarkdownFormatter:
 
         return "\n".join(lines)
 
-    def format_category(self, category: str, items: list[ContentItem]) -> str:
+    def format_category(self, category: str, items: list[ContentItem], translations: dict[str, str] | None = None) -> str:
         """格式化分类"""
         lines = [f"## {category}\n"]
 
         for i, item in enumerate(items, 1):
             lines.append(f"### {i}. {item.author_name}")
-            lines.append(self.format_item(item, include_author=False))
+            # 获取该条目的翻译（如果有）
+            trans = translations.get(item.id) if translations else None
+            lines.append(self.format_item(item, include_author=False, translation=trans))
             lines.append("")
 
         return "\n".join(lines)
@@ -54,7 +62,8 @@ class MarkdownFormatter:
     def format_daily_summary(
         self,
         categories: dict[str, list[ContentItem]],
-        date: str | None = None
+        date: str | None = None,
+        translations: dict[str, str] | None = None
     ) -> str:
         """格式化每日摘要"""
         if date is None:
@@ -83,7 +92,7 @@ class MarkdownFormatter:
 
         # 内容
         for category, items in categories.items():
-            lines.append(self.format_category(category, items))
+            lines.append(self.format_category(category, items, translations))
             lines.append("")
 
         # 页脚
@@ -100,7 +109,8 @@ class MarkdownFormatter:
         self,
         categories: dict[str, list[ContentItem]],
         date: str | None = None,
-        filename: str | None = None
+        filename: str | None = None,
+        translations: dict[str, str] | None = None
     ) -> str:
         """保存每日摘要"""
         if date is None:
@@ -110,7 +120,7 @@ class MarkdownFormatter:
             filename = f"{date}.md"
 
         filepath = os.path.join(self.output_dir, filename)
-        content = self.format_daily_summary(categories, date)
+        content = self.format_daily_summary(categories, date, translations)
 
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)

@@ -35,6 +35,7 @@ class MockDataSource(BaseDataSource):
                 author_username=username,
                 created_at=now - timedelta(hours=i * 2),
                 url=f"https://x.com/{username}/status/{i}000000000",
+                source="mock",  # 标记数据来源
                 likes=10000 - i * 1000,
                 retweets=3000 - i * 500,
             ))

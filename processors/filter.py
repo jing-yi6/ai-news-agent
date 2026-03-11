@@ -192,13 +192,6 @@ class ContentFilter:
 
         return "其他资讯"
 
-    def categorize(self, item: ContentItem) -> str:
-        """分类单条内容（同步版本，用于非 LLM 分类）"""
-        if self.use_llm_categorize and self.llm_provider:
-            # 异步版本需要在 async 上下文中调用
-            raise RuntimeError("请使用 categorize_items 方法进行 LLM 分类")
-        return self._categorize_with_keywords(item)
-
     async def categorize_items(self, items: list[ContentItem]) -> dict[str, list[ContentItem]]:
         """分类内容列表（支持异步并行 LLM 调用）"""
         categories: dict[str, list[ContentItem]] = {}

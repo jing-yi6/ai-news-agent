@@ -19,11 +19,11 @@ class XDataSource(BaseDataSource):
         self._client = None
         # 从配置中获取账号信息
         self._account_config = {
-            "username": config.get("username") or config.get("X_USERNAME"),
-            "password": config.get("password") or config.get("X_PASSWORD"),
-            "email": config.get("email") or config.get("X_EMAIL"),
-            "email_password": config.get("email_password") or config.get("X_EMAIL_PASSWORD"),
-            "cookies": config.get("cookies") or config.get("X_COOKIES"),
+            "username": config.get("username"),
+            "password": config.get("password"),
+            "email": config.get("email"),
+            "email_password": config.get("email_password"),
+            "cookies": config.get("cookies"),
         }
 
     def _get_client(self):
@@ -50,6 +50,7 @@ class XDataSource(BaseDataSource):
             author_username=tweet.author_username,
             created_at=tweet.created_at,
             url=f"https://x.com/{tweet.author_username}/status/{tweet.id}",
+            source="x",  # 标记数据来源
             likes=tweet.like_count,
             replies=tweet.reply_count,
             retweets=tweet.retweet_count,

@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from config import AppConfig, setup_logging
 from providers import create_llm_provider
 from datasources import create_datasource
-from processors import ContentFilter, Summarizer, MarkdownFormatter
+from processors import ContentFilter, Translator, MarkdownFormatter
 
 # 获取 logger
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def get_time_window(days_back: int = 1) -> tuple[str, str]:
 
     now = datetime.now(timezone.utc)
     start = (now - timedelta(days=days_back)).replace(hour=0, minute=0, second=0, microsecond=0)
-    end = now.replace(hour=23, minute=59, second=59, microsecond=0)
+    end = now
     return start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -55,9 +55,9 @@ async def main_async():
     """异步主函数"""
     args = parse_args()
 
-    # 设置日志（只记录 WARNING 及以上，生成带时间戳的日志文件）
+    # 设置日志（INFO 及以上级别，生成带时间戳的日志文件）
     log_dir = os.getenv("LOG_DIR", "logs")
-    log_file = setup_logging(log_dir=log_dir)
+    setup_logging(log_dir=log_dir)
 
     logger.info("=" * 60)
     logger.info("🤖 AI News Agent")
@@ -148,21 +148,26 @@ async def main_async():
     for cat, cat_items in categories.items():
         logger.info(f"  - {cat}: {len(cat_items)}")
 
-    # 生成摘要
+    translations = {}
     if provider:
-        logger.info("📝 生成关键要点...")
-        summarizer = Summarizer(provider)
-        for cat, cat_items in categories.items():
-            points = await summarizer.extract_key_points(cat_items, max_points=3)
-            if points:
-                logger.info(f"  [{cat}] {points[0][:50]}...")
+        logger.info("🌏 翻译内容...")
+        translator = Translator(provider)
+        # 收集所有条目，根据配置的 translate_sources 决定翻译哪些
+        all_items = []
+        for cat_items in categories.values():
+            all_items.extend(cat_items)
+        translations = await translator.translate_items(
+            all_items,
+            translate_sources=config.translate_sources
+        )
+        logger.info(f"📊 翻译完成: {len(translations)} 条")
 
     # 格式化输出
     logger.info("\n🎨 生成输出...")
     formatter = MarkdownFormatter(output_dir=args.output or config.output_dir)
 
     date = args.date or datetime.now().strftime("%Y-%m-%d")
-    summary_file = formatter.save_daily_summary(categories, date=date)
+    summary_file = formatter.save_daily_summary(categories, date=date, translations=translations)
 
     logger.info("")
     logger.info("=" * 60)

@@ -2,7 +2,7 @@
 Processors 模块
 """
 from processors.filter import ContentFilter
-from processors.summarizer import Summarizer
+from processors.translator import Translator
 from processors.formatter import MarkdownFormatter
 
-__all__ = ["ContentFilter", "Summarizer", "MarkdownFormatter"]
+__all__ = ["ContentFilter", "Translator", "MarkdownFormatter"]
