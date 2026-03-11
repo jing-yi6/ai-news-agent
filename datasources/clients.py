@@ -154,9 +154,9 @@ class XClient:
             try:
                 created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
             except (ValueError, TypeError):
-                created_at = datetime.now()
+                return None
         elif not isinstance(created_at, datetime):
-            created_at = datetime.now()
+            return None
 
         # 获取作者信息
         if author:
