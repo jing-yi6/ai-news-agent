@@ -35,7 +35,7 @@ class MarkdownFormatter:
 
         # 元信息
         meta = []
-        meta.append(f"🕐 {item.created_at.strftime('%H:%M')}")
+        meta.append(f"🕐 {item.created_at.strftime('%Y-%m-%d %H:%M')}")
         if item.likes:
             meta.append(f"❤️ {item.likes}")
         if item.retweets:
