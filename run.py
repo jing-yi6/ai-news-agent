@@ -70,10 +70,7 @@ async def main_async():
     datasource_name = args.datasource or ("mock" if args.mock else config.datasource.name)
 
     # 创建数据源
-    datasource = create_datasource(
-        datasource_name,
-        config.datasource.config if datasource_name == config.datasource.name else {}
-    )
+    datasource = create_datasource(datasource_name, config.datasource.config)
     logger.info(f"📡 数据源: {datasource_name}")
 
     # 创建 LLM Provider（如果启用）
@@ -135,7 +132,7 @@ async def main_async():
         llm_provider=provider,
         use_llm_categorize=args.use_llm and provider is not None
     )
-    filtered = filter_.filter_items(iter(items))
+    filtered = filter_.filter_items(items)
     logger.info(f"📊 过滤后: {len(filtered)}")
 
     if not filtered:

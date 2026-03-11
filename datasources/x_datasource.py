@@ -31,12 +31,12 @@ class XDataSource(BaseDataSource):
             # 检查是否有账号配置
             if not any(self._account_config.values()):
                 raise ValueError(
-                    "X 数据源需要账号配置。请在配置中提供:\n"
-                    "  - cookies: Twitter cookies 字符串，或\n"
-                    "  - username + password: Twitter 用户名和密码"
+                    "X 数据源需要账号配置。请提供以下之一:\n"
+                    "  - cookies + username: 在 .env 中设置 X_USERNAME 和 X_COOKIES\n"
+                    "  - username + password: 在 .env 中设置 X_USERNAME 和 X_PASSWORD"
                 )
             # 获取速率限制配置（默认 1.0 秒/次）
-            rate_limit = self.config.get("rate_limit") or self.config.get("X_RATE_LIMIT", 1.0)
+            rate_limit = self.config.get("rate_limit", 1.0)
             self._client = XClient(account_config=self._account_config, rate_limit=float(rate_limit))
         return self._client
 

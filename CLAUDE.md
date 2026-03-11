@@ -97,6 +97,7 @@ run.py
 ### Key Implementation Details
 
 - **Classification**: `ContentFilter` uses LLM categorization only when both `use_llm_categorize=True` AND `llm_provider` is provided. Otherwise falls back to keyword matching.
+- **Translation**: Translation requires `provider` to be available (either via `--use-llm` flag or pre-configured LLM). Content is translated only for sources listed in `TRANSLATE_SOURCES` environment variable.
 - **Time Windows**: `get_time_window()` in `run.py` generates ISO 8601 timestamps for the past 24 hours.
 - **Output**: Generated Markdown files are saved to `output/` directory with format `YYYY-MM-DD.md`.
 

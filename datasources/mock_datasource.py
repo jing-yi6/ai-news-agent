@@ -37,7 +37,9 @@ class MockDataSource(BaseDataSource):
                 url=f"https://x.com/{username}/status/{i}000000000",
                 source="mock",  # 标记数据来源
                 likes=10000 - i * 1000,
+                replies=2000 - i * 300,
                 retweets=3000 - i * 500,
+                quotes=500 - i * 100,
             ))
 
         return items
