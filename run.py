@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from config import AppConfig, setup_logging
 from providers import create_llm_provider
 from datasources import create_datasource
-from processors import ContentFilter, Translator, MarkdownFormatter
+from processors import ContentFilter, Translator, MarkdownFormatter, Deduplicator
 
 # 获取 logger
 logger = logging.getLogger(__name__)
@@ -137,6 +137,16 @@ async def main_async():
 
     if not filtered:
         logger.warning("⚠️ 没有符合条件的内容")
+        return
+
+    # 去重（基于昨天的日报 URL）
+    logger.info("🔄 去除昨日已抓取内容...")
+    deduplicator = Deduplicator(args.output or config.output_dir)
+    filtered = deduplicator.filter_new_items(filtered)
+    logger.info(f"📊 去重后: {len(filtered)}")
+
+    if not filtered:
+        logger.warning("⚠️ 去重后没有新内容")
         return
 
     # 分类
