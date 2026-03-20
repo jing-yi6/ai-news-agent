@@ -37,7 +37,13 @@ class XDataSource(BaseDataSource):
                 )
             # 获取速率限制配置（默认 1.0 秒/次）
             rate_limit = self.config.get("rate_limit", 1.0)
-            self._client = XClient(account_config=self._account_config, rate_limit=float(rate_limit))
+            # 获取代理配置
+            proxy = self.config.get("proxy")
+            self._client = XClient(
+                account_config=self._account_config,
+                rate_limit=float(rate_limit),
+                proxy=proxy
+            )
         return self._client
 
     def _tweet_to_item(self, tweet: Tweet) -> ContentItem:

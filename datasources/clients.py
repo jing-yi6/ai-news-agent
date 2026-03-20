@@ -31,10 +31,59 @@ def _patched_get_scripts_list(text: str):
         for k, v in json.loads(fixed_scripts).items():
             yield f"https://abs.twimg.com/responsive-web/client-web/{k}.{v}a.js"
 
+def _rextr(s: str, begin: str, end: str, pos: int) -> str | None:
+    end_idx = s.rfind(end, 0, pos)
+    if end_idx < 0:
+        return None
+    begin_idx = s.rfind(begin, 0, end_idx)
+    if begin_idx < 0:
+        return None
+    return s[begin_idx + len(begin):end_idx]
+
+
+def _fextr(s: str, begin: str, end: str, pos: int = 0) -> str | None:
+    start = s.find(begin, pos)
+    if start < 0:
+        return None
+    start += len(begin)
+    stop = s.find(end, start)
+    if stop < 0:
+        return None
+    return s[start:stop]
+
+
+async def _patched_parse_anim_idx(text: str) -> list[int]:
+    # New format: "ondemand.s" is a value in a name map, hash lives in a second
+    # map under the same key further in the HTML.
+    ondemand_pos = text.find('"ondemand.s"')
+    if ondemand_pos >= 0:
+        ondemand_key = _rextr(text, ",", ':', ondemand_pos)
+        if ondemand_key:
+            ondemand_s = _fextr(text, ondemand_key + ':"', '"', ondemand_pos)
+            if ondemand_s:
+                url = xclid.script_url("ondemand.s", f"{ondemand_s}a")
+                js_text = await xclid.get_tw_page_text(url)
+                items = [int(x.group(2)) for x in xclid.INDICES_REGEX.finditer(js_text)]
+                if items:
+                    return items
+
+    # Fallback: old format where the chunk map contains ondemand.s as a key.
+    scripts = list(xclid.get_scripts_list(text))
+    scripts = [u for u in scripts if "/ondemand.s." in u]
+    if not scripts:
+        raise Exception("Couldn't get XClientTxId scripts")
+    js_text = await xclid.get_tw_page_text(scripts[0])
+    items = [int(x.group(2)) for x in xclid.INDICES_REGEX.finditer(js_text)]
+    if not items:
+        raise Exception("Couldn't get XClientTxId indices")
+    return items
+
+
 # 应用 patch（在导入 twscrape 之前）
 try:
     from twscrape import xclid
     xclid.get_scripts_list = _patched_get_scripts_list
+    xclid.parse_anim_idx = _patched_parse_anim_idx
 except ImportError:
     pass  # twscrape 未安装时跳过
 
@@ -68,18 +117,20 @@ class User:
 class XClient:
     """X (Twitter) 客户端 - 使用 twscrape 库"""
 
-    def __init__(self, account_config: Optional[Dict] = None, rate_limit: float = 1.0):
+    def __init__(self, account_config: Optional[Dict] = None, rate_limit: float = 1.0, proxy: Optional[str] = None):
         """
         初始化 X 客户端
 
         Args:
             account_config: 账号配置
             rate_limit: 请求间隔（秒），默认 1 秒一次
+            proxy: 代理地址，如 http://127.0.0.1:7897
         """
         self.account_config = account_config or {}
         self._api = None
         self._initialized = False
         self._rate_limit = rate_limit
+        self._proxy = proxy
         self._last_request_time: Optional[float] = None
         self._lock = asyncio.Lock()
 
@@ -104,8 +155,12 @@ class XClient:
                 "twscrape is required. Install it with: pip install twscrape"
             )
 
-        # 初始化 API
-        self._api = API()
+        # 初始化 API（支持代理）
+        if self._proxy:
+            self._api = API(proxy=self._proxy)
+            logger.info(f"使用代理: {self._proxy}")
+        else:
+            self._api = API()
 
         # 如果有账号配置，添加账号
         if self.account_config:
@@ -206,6 +261,7 @@ class XClient:
             return self._to_user(user_data)
         except Exception as e:
             logger.warning(f"Error getting user {username}: {e}")
+            logger.exception(e)  # 添加完整堆栈
             return None
 
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
@@ -329,6 +385,7 @@ class XClient:
 
         except Exception as e:
             logger.error(f"Error getting following for user {user_id}: {e}")
+            logger.exception(e)  # 添加完整堆栈跟踪
 
         return following[:max_results]
 

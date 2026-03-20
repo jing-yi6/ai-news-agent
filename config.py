@@ -159,6 +159,8 @@ class DataSourceConfig:
                 "user_id": os.getenv("X_USER_ID"),
                 # 请求速率限制（秒/次）
                 "rate_limit": os.getenv("X_RATE_LIMIT", "1.0"),
+                # 代理配置
+                "proxy": os.getenv("X_PROXY"),
             }
         )
 
